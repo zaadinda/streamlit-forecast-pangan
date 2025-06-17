@@ -1,0 +1,25 @@
+.metric-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+div.stMetric {
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 1.5rem;
+    background-color: #fafafa;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s ease-in-out;
+}
+
+div.stMetric:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+div.stMetric > div {
+    justify-content: center;
+}
