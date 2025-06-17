@@ -1,9 +1,17 @@
-streamlit
-tensorflow
+# --- Core App & Web Framework ---
+streamlit==1.35.0
+
+# --- Deep Learning & Machine Learning ---
+tensorflow==2.16.1
+scikit-learn==1.5.0
+
+# --- Data Handling & Numerics ---
+pandas==2.2.2
+numpy==1.26.4
 joblib
-requests
-pandas
-numpy
+
+# --- API Calls & Visualisasi ---
+requests==2.32.3
+plotly==5.22.0
 matplotlib
-plotly
-scikit-learn
+
