@@ -1,0 +1,10 @@
+# Ignore model files
+models/*.h5
+models/*.pkl
+
+# Ignore data files
+data/*.xlsx
+
+# Ignore Python bytecode
+__pycache__/
+*.pyc
