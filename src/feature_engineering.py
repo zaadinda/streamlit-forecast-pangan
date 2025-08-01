@@ -51,7 +51,6 @@ def add_lag_and_rolling_features(df_pivot, target_cols):
 def full_preparation_pipeline(df_long, commodity_details):
     target_cols = commodity_details['targets']
     
-    # 1. Pivot data
     df_pivot = df_long.pivot_table(index='date', columns='komoditas_sub', values='harga')
     
     for col in target_cols:
@@ -74,9 +73,10 @@ def full_preparation_pipeline(df_long, commodity_details):
     df_processed = df_combined.dropna()
     
     if len(df_processed) < SEQ_LENGTH:
-        # returns 3 values: (None untuk sequence, None untuk feature_cols, dan pesan error)
-        error_message = f"Data historis tidak cukup untuk prediksi. Dibutuhkan {SEQ_LENGTH} hari data valid setelah feature engineering, hanya tersedia {
-            len(df_processed)} hari."
+        error_message = (
+            f"Data historis tidak cukup untuk prediksi. Dibutuhkan {SEQ_LENGTH} hari data valid "
+            f"setelah feature engineering, hanya tersedia {len(df_processed)} hari."
+        )
         return None, None, error_message
  
     # 6. Ambil sekuens terakhir dan daftar kolom fitur
