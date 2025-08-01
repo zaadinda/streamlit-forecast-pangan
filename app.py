@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 
-# Coba impor modul dari folder 'src'
 try:
     from src.config import COMMODITY_CONFIG
     from src.data_handler import fetch_bi_data, reshape_and_clean_data
@@ -13,7 +12,6 @@ except ImportError as e:
     st.error(f"Gagal mengimpor modul dari 'src'. Pastikan struktur folder benar dan semua dependensi terinstal. Detail: {e}")
     st.stop()
 
-# Konfigurasi halaman
 st.set_page_config(
     layout="wide",
     page_title="Proyeksi Harga Pangan",
@@ -21,12 +19,11 @@ st.set_page_config(
 )
 
 # =============================================================================
-# DEFINISI FUNGSI
+# HELPER
 # =============================================================================
 
 @st.cache_resource
 def load_models_and_dependencies():
-    """Memuat model dan scaler sekali saja menggunakan cache."""
     try:
         models, scalers = load_all_models_and_scalers(COMMODITY_CONFIG)
         return models, scalers
@@ -37,7 +34,6 @@ def load_models_and_dependencies():
 models, scalers = load_models_and_dependencies()
 
 def display_results():
-    """Menampilkan hasil sesuai dengan aksi yang dipilih pengguna."""
     action = st.session_state.get('action', 'forecast')
     results = st.session_state.results
     
@@ -58,7 +54,7 @@ def display_results():
     details = results.get('details')
 
     def render_tab_ringkasan():
-        st.subheader(f"Sorotan Proyeksi untuk {details['main']}")
+        st.subheader(f"Highlight Proyeksi untuk {details['main']}")
         tomorrow = datetime.now() + timedelta(days=1)
         days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
         months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -135,7 +131,6 @@ def display_results():
             """
         )
 
-    # --- Logika Router untuk Menampilkan Tab yang Sesuai ---
     if action == 'forecast':
         tabs = st.tabs(["📊 Ringkasan Proyeksi", "📈 Grafik Tren", "📋 Data Detail", "🔬 Analisis Statistik"])
         with tabs[0]:
@@ -155,7 +150,6 @@ def display_results():
         render_tab_data()
 
 def show_homepage():
-    """Menampilkan halaman awal yang lebih menarik."""
     col1, col2 = st.columns([1, 2.5], gap="large")
     with col1:
         st.markdown("<div style='display: flex; align-items: center; justify-content: center; height: 100%;'><p style='font-size: 8rem; text-align: center;'>💡</p></div>", unsafe_allow_html=True)
@@ -188,7 +182,6 @@ def show_homepage():
             st.button("Lihat & Unduh Data", use_container_width=True, on_click=set_action, args=['data'], key='b3')
 
 def show_parameter_form():
-    """Menampilkan form parameter dengan interaksi yang benar."""
     action = st.session_state.get('action', 'forecast')
     title_map = {'forecast': "Parameter Proyeksi Harga", 'tren': "Parameter Analisis Tren", 'data': "Parameter Data Detail"}
     st.header(f"⚙️ {title_map.get(action)}")
@@ -226,7 +219,6 @@ def show_parameter_form():
         st.rerun()
 
 def run_processing():
-    """Menjalankan proses backend untuk analisis."""
     params = st.session_state.params
     action = st.session_state.action
     details = COMMODITY_CONFIG[params["selected_commodity"]]
