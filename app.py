@@ -3,15 +3,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 
+# Coba impor modul dari folder 'src'
 try:
     from src.config import COMMODITY_CONFIG
     from src.data_handler import fetch_bi_data, reshape_and_clean_data
     from src.feature_engineering import full_preparation_pipeline
     from src.predictions import load_all_models_and_scalers, forecast_iteratively
 except ImportError as e:
-    st.error(f"Gagal mengimpor modul dari 'src'. Pastikan struktur folder benar. Detail: {e}")
+    st.error(f"Gagal mengimpor modul dari 'src'. Pastikan struktur folder benar dan semua dependensi terinstal. Detail: {e}")
     st.stop()
 
+# Konfigurasi halaman
 st.set_page_config(
     layout="wide",
     page_title="Proyeksi Harga Pangan",
@@ -19,244 +21,261 @@ st.set_page_config(
 )
 
 # =============================================================================
-# HELPER & LOAD ASSET
+# DEFINISI FUNGSI
 # =============================================================================
-
-def load_custom_css(file_name):
-    try:
-        with open(file_name) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning(f"File CSS '{file_name}' tidak ditemukan. Styling kustom mungkin tidak teraplikasikan.")
 
 @st.cache_resource
 def load_models_and_dependencies():
+    """Memuat model dan scaler sekali saja menggunakan cache."""
     try:
         models, scalers = load_all_models_and_scalers(COMMODITY_CONFIG)
         return models, scalers
     except Exception as e:
-        st.error(f"Gagal memuat file model/scaler. Pastikan path di 'src/config.py' benar. Detail: {e}")
+        st.error(f"Gagal memuat file model/scaler. Detail: {e}")
         st.stop()
 
-load_custom_css("style.css")
 models, scalers = load_models_and_dependencies()
 
-def display_prediction_results(results: dict):
-    st.success("✅ Proyeksi berhasil dibuat!")
+def display_results():
+    """Menampilkan hasil sesuai dengan aksi yang dipilih pengguna."""
+    action = st.session_state.get('action', 'forecast')
+    results = st.session_state.results
+    
+    title_map = {
+        'forecast': "Hasil Proyeksi Harga", 'tren': "Hasil Analisis Tren", 'data': "Detail Data Harga"
+    }
+    st.header(title_map.get(action, "Hasil Analisis"))
+    
+    if st.button("↩️ Buat Analisis Baru"):
+        for key in st.session_state.keys():
+            if key not in ['models', 'scalers']:
+                del st.session_state[key]
+        st.rerun()
     st.markdown("---")
 
-    df_forecast = results['df_forecast']
-    sequence_history = results['sequence_history']
-    details = results['details']
+    df_history = results.get('df_history')
+    df_forecast = results.get('df_forecast')
+    details = results.get('details')
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Ringkasan Proyeksi", 
-        "📈 Grafik Tren", 
-        "📋 Data Detail", 
-        "🔬 Analisis Statistik"
-    ])
-
-    # --- Tab 1: Ringkasan Proyeksi (Metrics) ---
-    with tab1:
-        st.subheader(f"Highlights Proyeksi untuk {details['main']}")
-        
+    def render_tab_ringkasan():
+        st.subheader(f"Sorotan Proyeksi untuk {details['main']}")
         tomorrow = datetime.now() + timedelta(days=1)
-        days_in_indonesian = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-        months_in_indonesian = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-        formatted_date = f"{days_in_indonesian[tomorrow.weekday()]}, {tomorrow.day} {months_in_indonesian[tomorrow.month]} {tomorrow.year}"
-        
-        st.markdown(f"Berikut adalah estimasi harga untuk esok hari: **{formatted_date}**.")
-        
-        st.markdown('<div class="metric-grid-container">', unsafe_allow_html=True)
+        days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+        months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        formatted_date = f"{days[tomorrow.weekday()]}, {tomorrow.day} {months[tomorrow.month]} {tomorrow.year}"
+        st.markdown(f"Estimasi harga untuk esok hari: **{formatted_date}**.")
+        st.write("") 
+        cols = st.columns(len(details['targets']))
         next_day_prices = df_forecast.iloc[0]
-        history_for_delta = sequence_history[details['targets']]
-
-        for target_name in details['targets']:
-            with st.container():
-                last_known_price = history_for_delta[target_name].iloc[-1]
+        for i, target_name in enumerate(details['targets']):
+            with cols[i]:
+                last_known_price = df_history[target_name].iloc[-1]
                 predicted_price = next_day_prices[target_name]
                 delta_value = predicted_price - last_known_price
-                
-                st.metric(
-                    label=target_name,
-                    value=f"Rp {predicted_price:,.0f}"
-                )
-
+                st.markdown(f"**{target_name}**")
+                st.markdown(f"<p style='font-size: 2rem; font-weight: 600; margin: 0;'>Rp {predicted_price:,.0f}</p>", unsafe_allow_html=True)
                 if delta_value >= 0:
-                    arrow = "▲"
-                    color = "red" 
+                    arrow, bg_color, text_color = "↑", "#ffeded", "#a60000"
                 else:
-                    arrow = "▼"
-                    color = "green"
-                
-                delta_text = f"Rp {abs(delta_value):,.0f} vs kemarin"
-                st.markdown(f'<p style="text-align: center; color:{color}; font-size: 0.9rem;">{arrow} {delta_text}</p>', unsafe_allow_html=True)
+                    arrow, bg_color, text_color = "↓", "#e6ffed", "#006400"
+                delta_text = f"Rp {abs(delta_value):,.0f}"
+                delta_html = f"""<div style="display: inline-block; background-color: {bg_color}; color: {text_color}; padding: 3px 8px; border-radius: 15px; font-size: 0.9em; font-weight: 500; line-height: 1;">{arrow} {delta_text}</div>"""
+                st.markdown(delta_html, unsafe_allow_html=True)
+        st.caption("Perubahan harga (delta) dibandingkan dengan harga historis terakhir yang diketahui.")
 
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.caption("Perubahan harga dibandingkan dengan harga historis terakhir yang diketahui.")
-
-    # --- Tab 2: Grafik Tren ---
-    with tab2:
-        st.subheader("Grafik Tren Harga Historis vs. Harga Proyeksi 30 Hari")
-        
-        history_to_plot = sequence_history[details['targets']]
+    def render_tab_grafik():
+        st.subheader("Grafik Tren Harga")
+        if df_forecast is None and action == 'forecast':
+             st.info("💡 Grafik ini hanya menampilkan data historis karena data proyeksi gagal dibuat. Coba dengan rentang tanggal yang lebih panjang.", icon="ℹ️")
         fig = go.Figure()
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-        
         for i, col in enumerate(details['targets']):
             color = colors[i % len(colors)]
-            fig.add_trace(go.Scatter(x=history_to_plot.index, y=history_to_plot[col], mode='lines', name=f'Historis - {col}', line=dict(color=color)))
-            fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast[col], mode='lines', name=f'Proyeksi - {col}', line=dict(dash='dash', color=color)))
-        
-        fig.add_vline(x=history_to_plot.index[-1].value, line_width=2, line_dash="dot", line_color="grey", annotation_text="Mulai Proyeksi", annotation_position="top right")
-        
-        fig.update_layout(
-            margin=dict(t=120, b=80),
-            xaxis_title='Tanggal', 
-            yaxis_title='Harga (Rp)', 
-            hovermode='x unified',
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
+            fig.add_trace(go.Scatter(x=df_history.index, y=df_history[col], mode='lines+markers', name=f'Historis - {col}', line=dict(color=color)))
+            if df_forecast is not None:
+                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast[col], mode='lines', name=f'Proyeksi - {col}', line=dict(dash='dash', color=color)))
+                fig.add_vline(x=df_history.index[-1].value, line_width=2, line_dash="dot", line_color="grey", annotation_text="Mulai Proyeksi", annotation_position="top right")
+        fig.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (Rp)', hovermode='x unified', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
 
-    # --- Tab 3: Data Detail ---
-    with tab3:
-        st.subheader("Tabel Detail Proyeksi Harga 30 Hari")
-        st.dataframe(df_forecast.style.format("Rp {:,.2f}"), use_container_width=True)
-        
+    def render_tab_data():
+        df_to_show = df_forecast if df_forecast is not None else df_history
+        st.subheader("Tabel Detail Data")
+        st.dataframe(df_to_show.style.format("Rp {:,.0f}"), use_container_width=True)
         @st.cache_data
-        def convert_df_to_csv(df_to_convert):
-            return df_to_convert.to_csv(index=True).encode('utf-8')
-        
-        csv = convert_df_to_csv(df_forecast)
-        st.download_button(
-            label="📥 Download Data Proyeksi (CSV)", 
-            data=csv,
-            file_name=f"proyeksi_{details['main']}_{datetime.now().strftime('%Y%m%d')}.csv", 
-            mime="text/csv"
-        )
-    
-    # --- Tab 4: Analisis Statistik ---
-    with tab4:
-        st.subheader(f"Analisis Statistik untuk {details['main']}")
-        st.markdown(f"Statistik dihitung berdasarkan data historis yang Anda pilih ({sequence_history.index.min().strftime('%d %B %Y')} hingga {sequence_history.index.max().strftime('%d %B %Y')}).")
-        
-        history_for_stats = sequence_history[details['targets']]
-        stats_cols = st.columns(len(details['targets']))
+        def convert_df_to_csv(df):
+            return df.to_csv(index=True).encode('utf-8')
+        csv = convert_df_to_csv(df_to_show)
+        st.download_button(label="📥 Download Data (CSV)", data=csv, file_name=f"data_{details['main']}_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
 
+    def render_tab_statistik():
+        st.subheader("Analisis Statistik Data Historis")
+        st.markdown(f"Statistik dihitung dari {df_history.index.min().strftime('%d %B %Y')} hingga {df_history.index.max().strftime('%d %B %Y')}.")
+        st.divider()
+        stats_cols = st.columns(len(details['targets']))
         for i, target_name in enumerate(details['targets']):
             with stats_cols[i]:
-                st.markdown(f"#### {target_name}")
-                st.markdown("---")
-                
+                st.markdown(f"<h5>{target_name}</h5>", unsafe_allow_html=True)
                 stats_data = {
-                    "Harga Rata-rata": f"Rp {history_for_stats[target_name].mean():,.0f}",
-                    "Harga Tertinggi": f"Rp {history_for_stats[target_name].max():,.0f}",
-                    "Harga Terendah": f"Rp {history_for_stats[target_name].min():,.0f}",
-                    "Tingkat Fluktuasi (StDev)": f"Rp {history_for_stats[target_name].std():,.0f}"
+                    "Harga Rata-rata": f"Rp {df_history[target_name].mean():,.0f}",
+                    "Harga Tertinggi": f"Rp {df_history[target_name].max():,.0f}",
+                    "Harga Terendah": f"Rp {df_history[target_name].min():,.0f}",
+                    "Tingkat Fluktuasi (StDev)": f"Rp {df_history[target_name].std():,.0f}"
                 }
-                
                 for label, value in stats_data.items():
                     st.caption(label)
                     st.markdown(f"**{value}**")
+        st.divider()
+        st.info(
+            icon="💡",
+            body="""
+            **Apa itu Tingkat Fluktuasi (StDev)?**
 
-        st.markdown("---")
-        st.info("**Apa itu Tingkat Fluktuasi (StDev)?**\n\nStandar Deviasi (StDev) mengukur seberapa besar harga suatu barang menyebar dari harga rata-ratanya. Semakin tinggi angkanya, semakin tidak stabil atau semakin **sering harga barang tersebut berfluktuasi** selama periode yang dipilih.", icon="💡")
+            Standar Deviasi (StDev) mengukur seberapa besar harga suatu barang menyebar dari harga rata-ratanya. Semakin tinggi angkanya, semakin tidak stabil atau semakin **sering harga barang tersebut berfluktuasi** selama periode yang dipilih.
+            """
+        )
+
+    # --- Logika Router untuk Menampilkan Tab yang Sesuai ---
+    if action == 'forecast':
+        tabs = st.tabs(["📊 Ringkasan Proyeksi", "📈 Grafik Tren", "📋 Data Detail", "🔬 Analisis Statistik"])
+        with tabs[0]:
+            if df_forecast is not None and not df_forecast.empty:
+                render_tab_ringkasan()
+            else:
+                st.warning("Gagal menghasilkan data proyeksi.", icon="⚠️")
+                st.info("Penyebab umum: rentang data historis yang dipilih terlalu pendek atau tidak mengandung cukup variasi. Silakan coba lagi dengan rentang tanggal yang lebih panjang (disarankan > 90 hari).")
+        with tabs[1]: render_tab_grafik()
+        with tabs[2]: render_tab_data()
+        with tabs[3]: render_tab_statistik()
+    elif action == 'tren':
+        tabs = st.tabs(["📈 Grafik Tren", "🔬 Analisis Statistik"])
+        with tabs[0]: render_tab_grafik()
+        with tabs[1]: render_tab_statistik()
+    elif action == 'data':
+        render_tab_data()
+
+def show_homepage():
+    """Menampilkan halaman awal yang lebih menarik."""
+    col1, col2 = st.columns([1, 2.5], gap="large")
+    with col1:
+        st.markdown("<div style='display: flex; align-items: center; justify-content: center; height: 100%;'><p style='font-size: 8rem; text-align: center;'>💡</p></div>", unsafe_allow_html=True)
+    with col2:
+        st.subheader("Selamat Datang di Aplikasi Analisis Harga Pangan")
+        st.write("Platform ini membantu Anda memahami fluktuasi harga pangan di Jawa Barat. Anda dapat melihat tren historis, mengunduh data, hingga mendapatkan proyeksi harga berbasis *machine learning*.")
+        st.write("Pilih salah satu menu di bawah ini untuk memulai.")
+    st.divider()
+
+    st.write("#### Apa yang ingin Anda lakukan?")
+    col1, col2, col3 = st.columns(3, gap="medium")
+    def set_action(action_type):
+        st.session_state.view = 'show_form'
+        st.session_state.action = action_type
+
+    with col1:
+        with st.container(border=True, height=240):
+            st.markdown("<h3 style='text-align: center;'>📊 Analisis Tren</h3>", unsafe_allow_html=True)
+            st.write("Visualisasikan data historis dalam grafik dan lihat statistik utamanya untuk memahami pola pasar.")
+            st.button("Mulai Analisis", use_container_width=True, on_click=set_action, args=['tren'], key='b1')
+    with col2:
+        with st.container(border=True, height=240):
+            st.markdown("<h3 style='text-align: center;'>🤖 Proyeksi Harga</h3>", unsafe_allow_html=True)
+            st.write("Gunakan model *Deep Learning* untuk mendapat estimasi harga komoditas hingga 30 hari ke depan.")
+            st.button("Buat Proyeksi", type="primary", use_container_width=True, on_click=set_action, args=['forecast'], key='b2')
+    with col3:
+        with st.container(border=True, height=240):
+            st.markdown("<h3 style='text-align: center;'>📋 Detail Data</h3>", unsafe_allow_html=True)
+            st.write("Lihat dan unduh data harga dalam format tabel (CSV) untuk Anda olah dan analisis lebih lanjut.")
+            st.button("Lihat & Unduh Data", use_container_width=True, on_click=set_action, args=['data'], key='b3')
+
+def show_parameter_form():
+    """Menampilkan form parameter dengan interaksi yang benar."""
+    action = st.session_state.get('action', 'forecast')
+    title_map = {'forecast': "Parameter Proyeksi Harga", 'tren': "Parameter Analisis Tren", 'data': "Parameter Data Detail"}
+    st.header(f"⚙️ {title_map.get(action)}")
+
+    selected_commodity = st.selectbox(
+        "Pilih Kelompok Komoditas", 
+        list(COMMODITY_CONFIG.keys()), 
+        help="Pilih kelompok komoditas yang ingin dianalisis. Detail di bawah akan otomatis berubah."
+    )
+    details = COMMODITY_CONFIG[selected_commodity]
+    with st.expander("Lihat Detail Sub-Komoditas"):
+        for target in details['targets']:
+            st.markdown(f"- {target}")
+
+    with st.form(key="parameter_form"):
+        st.info("Pilih rentang data historis sebagai dasar analisis. Disarankan minimal 90 hari untuk hasil proyeksi yang lebih akurat.", icon="💡")
+        today = datetime.now().date()
+        c1, c2 = st.columns(2)
+        with c1:
+            start_date = st.date_input("Dari Tanggal", value=today - timedelta(days=90), max_value=today - timedelta(days=1))
+        with c2:
+            end_date = st.date_input("Hingga Tanggal", value=today, max_value=today)
+        st.divider()
+        submitted = st.form_submit_button("Proses Data", type="primary", use_container_width=True)
+
+        if submitted:
+            if start_date >= end_date or (end_date - start_date).days < 7:
+                st.error("Rentang tanggal tidak valid. Pastikan minimal 7 hari dan tanggal mulai sebelum tanggal akhir.")
+            else:
+                st.session_state.params = {"selected_commodity": selected_commodity, "start_date": start_date, "end_date": end_date}
+                st.session_state.view = 'run_process'
+                st.rerun()
+    if st.button("Kembali ke Halaman Awal"):
+        st.session_state.view = 'home'
+        st.rerun()
+
+def run_processing():
+    """Menjalankan proses backend untuk analisis."""
+    params = st.session_state.params
+    action = st.session_state.action
+    details = COMMODITY_CONFIG[params["selected_commodity"]]
+    with st.spinner("Memproses data..."):
+        st.write("1/2 - Mengambil & membersihkan data historis...")
+        df_raw = fetch_bi_data(params["start_date"].strftime('%Y-%m-%d'), params["end_date"].strftime('%Y-%m-%d'))
+        if df_raw.empty: st.error("Tidak ada data ditemukan."); st.stop()
+        df_long = reshape_and_clean_data(df_raw, details)
+        if df_long.empty: st.error(f"Data untuk '{params['selected_commodity']}' tidak tersedia."); st.stop()
+        sequence, feature_cols, error_msg = full_preparation_pipeline(df_long, details)
+        if error_msg: st.error(error_msg); st.stop()
+        df_history = sequence[details['targets']]
+        df_forecast = None
+
+        if action == 'forecast':
+            st.write("2/2 - Menghitung proyeksi 30 hari ke depan...")
+            if (params["end_date"] - params["start_date"]).days < 30:
+                st.warning("Rentang data untuk proyeksi disarankan minimal 30 hari untuk hasil optimal.", icon="⚠️")
+            all_predicted_prices = forecast_iteratively(models[params['selected_commodity']], scalers[params['selected_commodity']], sequence.copy(), feature_cols, details['targets'], future_steps=30)
+            forecast_dates = pd.date_range(start=datetime.now().date() + timedelta(days=1), periods=30)
+            df_forecast = pd.DataFrame(all_predicted_prices, index=forecast_dates, columns=details['targets'])
+            df_forecast.index.name = "Tanggal"
+
+        st.session_state.results = {"df_history": df_history, "df_forecast": df_forecast, "details": details}
+        st.session_state.view = 'show_results'
+        st.rerun()
 
 # =============================================================================
-# MAIN APP
+# MAIN APP ROUTER
 # =============================================================================
 
 def main():
-    """Fungsi utama yang menjalankan alur aplikasi dan logika UI."""
-    if 'prediction_generated' not in st.session_state:
-        st.session_state.prediction_generated = False
-        st.session_state.results = None
+    st.markdown("<h1 style='text-align: center; color: #1f77b4;'>Analisis dan Proyeksi Harga Pangan</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Platform Cerdas untuk Memantau Fluktuasi Harga Pangan Strategis di Jawa Barat</p>", unsafe_allow_html=True)
+    st.divider()
 
-    with st.sidebar:
-        st.title("⚙️ Parameter Proyeksi")
-        st.markdown("Atur parameter di bawah ini untuk menghasilkan proyeksi.")
-        
-        selected_commodity = st.selectbox("Pilih Kelompok Komoditas", list(COMMODITY_CONFIG.keys()))
-        details = COMMODITY_CONFIG[selected_commodity]
-        
-        with st.expander("Lihat Detail Sub-Komoditas"):
-            for target in details['targets']:
-                st.markdown(f"- {target}")
-                
-        st.subheader("🗓️ Periode Analisis")
-        st.info("Pilih rentang data historis sebagai dasar analisis. Disarankan minimal 60-90 hari.", icon="💡")
-        
-        today = datetime.now().date()
-        default_start_date = today - timedelta(days=90)
-        start_date = st.date_input("Dari Tanggal", value=default_start_date, max_value=today)
-        end_date = st.date_input("Hingga Tanggal", value=today, max_value=today)
-        
-        st.markdown("---")
-        predict_button = st.button("💰 Cek Proyeksi Harga", type="primary", use_container_width=True)
+    if 'view' not in st.session_state:
+        st.session_state.view = 'home'
 
-    st.title("📈 Proyeksi Harga Pangan Strategis Jawa Barat")
-    st.markdown("📣 Antisipasi fluktuasi harga! Lihat tren terkini dan dapatkan proyeksi harga pangan di Jawa Barat untuk 30 hari mendatang.")
+    view_router = {'home': show_homepage, 'show_form': show_parameter_form, 'run_process': run_processing, 'show_results': display_results}
+    view_router[st.session_state.view]()
 
-    with st.expander("ℹ️ Tentang Aplikasi & Data"):
+    st.divider()
+    with st.expander("ℹ️ Tentang Aplikasi, Sumber Data, & Disclaimer"):
         st.markdown("""
-        - **Sumber Data**: Data harga diakses secara *real-time* dari **Pusat Informasi Harga Pangan Strategis (PIHPS) Nasional**, yang dikelola oleh Bank Indonesia.
-        - **Sumber Pasar**: Semua data harga bersumber dari **pasar tradisional** di wilayah Jawa Barat.
-        - **Satuan**: Beras & Telur Ayam (per kg), Minyak Goreng (per Liter).
-        
-        ***‼️Disclaimer**: Proyeksi ini adalah hasil estimasi model matematis dan bukan merupakan jaminan harga di masa depan.*
+        - **Sumber Data**: Data harga diakses dari **Pusat Informasi Harga Pangan Strategis (PIHPS) Nasional** (Bank Indonesia).
+        - **Model**: Proyeksi dihasilkan oleh model *Long Short-Term Memory* (LSTM).
+        - ***Disclaimer***: Proyeksi ini adalah hasil estimasi model matematis dan bukan jaminan harga di masa depan.
         """)
-
-    if predict_button:
-        if start_date > end_date:
-            st.error("Tanggal mulai tidak boleh melebihi tanggal akhir."); st.stop()
-        if (end_date - start_date).days < 30:
-            st.warning("Rentang data terlalu pendek. Disarankan minimal 30 hari untuk analisis."); st.stop()
-            
-        with st.spinner("Memproses data... Ini mungkin memakan waktu beberapa saat."):
-            st.write("1/4 - Menghubungi server Bank Indonesia...")
-            df_raw = fetch_bi_data(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            if df_raw.empty: st.error("Tidak ada data ditemukan."); st.stop()
-            
-            st.write("2/4 - Membersihkan dan menyusun data...")
-            df_long = reshape_and_clean_data(df_raw, details)
-            if df_long.empty: st.error(f"Data untuk '{selected_commodity}' tidak tersedia."); st.stop()
-            
-            st.write("3/4 - Menganalisis pola data historis...")
-            sequence, feature_cols, error_msg = full_preparation_pipeline(df_long, details)
-            if error_msg: st.error(error_msg); st.stop()
-            
-            st.write("4/4 - Menghitung proyeksi 30 hari ke depan...")
-            all_predicted_prices = forecast_iteratively(models[selected_commodity], scalers[selected_commodity], sequence, feature_cols, details['targets'], future_steps=30)
-            
-            forecast_dates = pd.date_range(start=datetime.now() + timedelta(days=1), periods=30)
-            df_forecast = pd.DataFrame(all_predicted_prices, index=forecast_dates, columns=details['targets'])
-            df_forecast.index.name = "Tanggal"
-            
-            st.session_state.results = {"df_forecast": df_forecast, "sequence_history": sequence, "details": details}
-            st.session_state.prediction_generated = True
-            st.rerun()
-
-    if st.session_state.prediction_generated and st.session_state.results:
-        display_prediction_results(st.session_state.results)
-    else:
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.subheader("📊 Analisis Tren")
-            st.write("Lihat data harga historis dari PIHPS Nasional dalam grafik yang interaktif dan informatif.")
-        with col2:
-            st.subheader("🤖 Smart Forecasting")
-            st.write("Dapatkan proyeksi harga untuk 30 hari ke depan menggunakan model Deep Learning LSTM dengan akurasi terbaik.")
-        with col3:
-            st.subheader("💡 Keputusan Terinformasi")
-            st.write("Gunakan data, analisis fluktuasi, dan proyeksi untuk membantu strategi Anda.")
-        st.info("**Selamat Datang!** Silakan pilih parameter pada panel di sebelah kiri untuk memulai.", icon="👋")
-
-
-# =============================================================================
-# ENTRY POINT APP
-# =============================================================================
 
 if __name__ == "__main__":
     main()

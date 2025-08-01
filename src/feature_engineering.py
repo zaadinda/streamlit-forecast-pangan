@@ -49,16 +49,11 @@ def add_lag_and_rolling_features(df_pivot, target_cols):
     return pd.concat(feature_dfs, axis=1)
 
 def full_preparation_pipeline(df_long, commodity_details):
-    """
-    Menjalankan seluruh pipeline persiapan data: pivot, feature engineering, dan pembersihan.
-    Mengembalikan sequence terakhir yang siap untuk prediksi.
-    """
     target_cols = commodity_details['targets']
     
     # 1. Pivot data
     df_pivot = df_long.pivot_table(index='date', columns='komoditas_sub', values='harga')
     
-    # Pastikan semua kolom target ada, isi dengan NaN jika tidak ada lalu interpolasi
     for col in target_cols:
         if col not in df_pivot:
             df_pivot[col] = np.nan
@@ -80,15 +75,13 @@ def full_preparation_pipeline(df_long, commodity_details):
     
     if len(df_processed) < SEQ_LENGTH:
         # returns 3 values: (None untuk sequence, None untuk feature_cols, dan pesan error)
-        error_message = f"Data historis tidak cukup untuk prediksi. Dibutuhkan {SEQ_LENGTH} hari data valid setelah feature engineering, hanya tersedia {len(df_processed)} hari."
+        error_message = f"Data historis tidak cukup untuk prediksi. Dibutuhkan {SEQ_LENGTH} hari data valid setelah feature engineering, hanya tersedia {
+            len(df_processed)} hari."
         return None, None, error_message
  
     # 6. Ambil sekuens terakhir dan daftar kolom fitur
     prediction_sequence = df_processed.tail(SEQ_LENGTH)
     feature_cols = [col for col in df_processed.columns if col not in target_cols]
     
-    # Pastikan urutan kolom sesuai dengan saat training
     prediction_sequence = prediction_sequence[target_cols + feature_cols]
-    
-    # Jika berhasil, kembalikan 3 nilai (sequence, feature_cols, dan None untuk pesan error)
     return prediction_sequence, feature_cols, None
