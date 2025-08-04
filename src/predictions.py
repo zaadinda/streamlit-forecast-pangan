@@ -1,6 +1,6 @@
 import streamlit as st
 import joblib
-from tensorflow.keras.models import load_model
+from keras.models import load_model
 import numpy as np
 import pandas as pd
 
