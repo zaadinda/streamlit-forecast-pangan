@@ -154,9 +154,9 @@ def show_homepage():
     with col1:
         st.markdown("<div style='display: flex; align-items: center; justify-content: center; height: 100%;'><p style='font-size: 8rem; text-align: center;'>💡</p></div>", unsafe_allow_html=True)
     with col2:
-        st.subheader("Selamat Datang di Aplikasi Analisis Harga Pangan")
+        st.subheader("Selamat Datang di Dashboard Analisis Harga Pangan")
         st.write("Platform ini membantu Anda memahami fluktuasi harga pangan di Jawa Barat. Anda dapat melihat tren historis, mengunduh data, hingga mendapatkan proyeksi harga berbasis *machine learning*.")
-        st.write("Pilih salah satu menu di bawah ini untuk memulai.")
+        st.write("Pilih salah satu menu di bawah ini untuk memulai. 👇🏻")
     st.divider()
 
     st.write("#### Apa yang ingin Anda lakukan?")
@@ -168,17 +168,17 @@ def show_homepage():
     with col1:
         with st.container(border=True, height=240):
             st.markdown("<h3 style='text-align: center;'>📊 Analisis Tren</h3>", unsafe_allow_html=True)
-            st.write("Visualisasikan data historis dalam grafik dan lihat statistik utamanya untuk memahami pola pasar.")
+            st.write("Memvisualisasikan data historis dalam grafik dan melihat statistik utamanya untuk memahami pola pasar.")
             st.button("Mulai Analisis", use_container_width=True, on_click=set_action, args=['tren'], key='b1')
     with col2:
         with st.container(border=True, height=240):
             st.markdown("<h3 style='text-align: center;'>🤖 Proyeksi Harga</h3>", unsafe_allow_html=True)
-            st.write("Gunakan model *Deep Learning* untuk mendapat estimasi harga komoditas hingga 30 hari ke depan.")
+            st.write("Menggunakan model *Deep Learning* untuk mendapat estimasi harga komoditas hingga 30 hari ke depan.")
             st.button("Buat Proyeksi", type="primary", use_container_width=True, on_click=set_action, args=['forecast'], key='b2')
     with col3:
         with st.container(border=True, height=240):
             st.markdown("<h3 style='text-align: center;'>📋 Detail Data</h3>", unsafe_allow_html=True)
-            st.write("Lihat dan unduh data harga dalam format tabel (CSV) untuk Anda olah dan analisis lebih lanjut.")
+            st.write("Melihat dan mengunduh data harga dalam format tabel (CSV) untuk Anda olah dan analisis lebih lanjut.")
             st.button("Lihat & Unduh Data", use_container_width=True, on_click=set_action, args=['data'], key='b3')
 
 def show_parameter_form():
