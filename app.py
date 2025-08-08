@@ -38,7 +38,7 @@ def display_results():
     results = st.session_state.results
     
     title_map = {
-        'forecast': "Hasil Proyeksi Harga", 'tren': "Hasil Analisis Tren", 'data': "Detail Data Harga"
+        'forecast': "Hasil Proyeksi Harga", 'tren': "Hasil Analisis Tren", 'data': "Detail Data Harga Pangan"
     }
     st.header(title_map.get(action, "Hasil Analisis"))
     
@@ -172,7 +172,7 @@ def show_homepage():
             st.button("Mulai Analisis", use_container_width=True, on_click=set_action, args=['tren'], key='b1')
     with col2:
         with st.container(border=True, height=240):
-            st.markdown("<h3 style='text-align: center;'>🤖 Proyeksi Harga</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>🤖 Smart Forecasting</h3>", unsafe_allow_html=True)
             st.write("Menggunakan model *Deep Learning* untuk mendapat estimasi harga komoditas hingga 30 hari ke depan.")
             st.button("Buat Proyeksi", type="primary", use_container_width=True, on_click=set_action, args=['forecast'], key='b2')
     with col3:
